@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Para ti 🌸</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d1b2a;touch-action:manipulation;
+    font-family:Georgia,'Times New Roman',serif;-webkit-user-select:none;user-select:none}
+  canvas{display:block;position:fixed;inset:0;touch-action:none}
+  #msg{position:fixed;left:0;right:0;top:0;text-align:center;color:#fff;
+    padding:calc(env(safe-area-inset-top,0px) + 28px) 24px 0;pointer-events:none}
+  #msg h1{margin:0 0 8px;font-size:28px;font-weight:normal;text-shadow:0 2px 12px rgba(0,0,0,.5)}
+  #msg p{margin:0;font-size:16px;opacity:.85;line-height:1.4;transition:opacity 1s}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="msg">
+  <h1 id="title"></h1>
+  <p id="sub"></p>
+</div>
+
+<script>
+// ✏️ PERSONALIZA AQUÍ ✏️
+const TITULO   = "Para ti, [Nombre] 🌸";
+const MENSAJE  = "Toca la pantalla para plantar flores";
+const FINAL    = "Cada flor es un motivo por el que me alegra tenerte en mi vida 💖";
+const FLORES_PARA_MENSAJE_FINAL = 8;
+
+document.getElementById('title').textContent = TITULO;
+const sub = document.getElementById('sub');
+sub.textContent = MENSAJE;
+
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+let W, H, dpr;
+function resize(){
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W*dpr; cv.height = H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+addEventListener('resize', resize); resize();
+
+const flowers = [], sparks = [], stars = [];
+for(let i=0;i<70;i++) stars.push({x:Math.random(),y:Math.random()*0.8,r:Math.random()*1.4+.3,p:Math.random()*6});
+
+function plant(x, y){
+  const hue = [330,350,20,45,280,200,0][Math.floor(Math.random()*7)] + Math.random()*20;
+  flowers.push({
+    x0: x + (Math.random()-.5)*30,
+    x, y,
+    size: 22 + Math.random()*18,
+    petals: 6 + Math.floor(Math.random()*4),
+    hue, stem: 0, bloom: 0,
+    ph: Math.random()*6, rot: Math.random()*6
+  });
+  if(flowers.length === FLORES_PARA_MENSAJE_FINAL){
+    sub.style.opacity = 0;
+    setTimeout(()=>{ sub.textContent = FINAL; sub.style.opacity = .95; }, 1000);
+  }
+}
+
+function burst(x, y, hue){
+  for(let i=0;i<14;i++){
+    const a = Math.random()*Math.PI*2, s = 1 + Math.random()*2.5;
+    sparks.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,hue});
+  }
+}
+
+const ripples = [];
+function onTap(e){
+  e.preventDefault();
+  const r = cv.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (W / r.width);
+  const y = (e.clientY - r.top) * (H / r.height);
+  const py = Math.min(y, H-80);
+  ripples.push({x, y:py, life:1});
+  plant(x, py);
+}
+cv.addEventListener('pointerdown', onTap);
+
+function drawFlower(f, t){
+  const sway = Math.sin(t/900 + f.ph) * 6 * f.stem;
+  const baseY = H + 10;
+  const tx = f.x + sway, ty = baseY + (f.y - baseY) * f.stem;
+  ctx.strokeStyle = '#3a9d5d'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(f.x0, baseY);
+  ctx.quadraticCurveTo(f.x0 + (tx-f.x0)*0.2 - 15, (baseY+ty)/2, tx, ty); ctx.stroke();
+  if(f.stem > .5){
+    const lx = f.x0 + (tx-f.x0)*.45, ly = baseY + (ty-baseY)*.55;
+    ctx.fillStyle = '#4cc27a';
+    for(const d of [-1,1]){
+      ctx.save(); ctx.translate(lx, ly); ctx.rotate(d*0.9 - 0.2);
+      ctx.beginPath(); ctx.ellipse(d*10, 0, 12*Math.min(1,(f.stem-.5)*2), 5, 0, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+  }
+  if(f.bloom > 0){
+    const R = f.size * f.bloom;
+    ctx.save(); ctx.translate(tx, ty); ctx.rotate(f.rot + t/6000);
+    for(let i=0;i<f.petals;i++){
+      ctx.save(); ctx.rotate(i*Math.PI*2/f.petals);
+      ctx.fillStyle = `hsl(${f.hue},85%,${68 - (i%2)*8}%)`;
+      ctx.beginPath(); ctx.ellipse(0, -R*.8, R*.42, R*.85, 0, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = '#ffd54a';
+    ctx.beginPath(); ctx.arc(0,0,R*.38,0,7); ctx.fill();
+    ctx.fillStyle = '#e8a317';
+    ctx.beginPath(); ctx.arc(0,0,R*.18,0,7); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function frame(t){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#0d1b2a'); g.addColorStop(1,'#3b2a4a');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#fff';
+  for(const s of stars){
+    ctx.globalAlpha = .4 + .6*Math.abs(Math.sin(t/1000 + s.p));
+    ctx.beginPath(); ctx.arc(s.x*W, s.y*H, s.r, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  for(const f of flowers){
+    if(f.stem < 1) f.stem = Math.min(1, f.stem + 0.05);
+    else if(f.bloom < 1){
+      f.bloom = Math.min(1, f.bloom + 0.03);
+      if(f.bloom === 1) burst(f.x, f.y, f.hue);
+    }
+    drawFlower(f, t);
+  }
+  for(let i=ripples.length-1;i>=0;i--){
+    const r = ripples[i];
+    r.life -= 0.03;
+    if(r.life <= 0){ ripples.splice(i,1); continue; }
+    ctx.strokeStyle = `rgba(255,255,255,${r.life})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + (1-r.life)*40, 0, 7); ctx.stroke();
+  }
+  for(let i=sparks.length-1;i>=0;i--){
+    const p = sparks[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.life -= 0.02;
+    if(p.life <= 0){ sparks.splice(i,1); continue; }
+    ctx.fillStyle = `hsla(${p.hue},90%,75%,${p.life})`;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 2.5*p.life, 0, 7); ctx.fill();
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+setTimeout(()=>plant(W*.25, H*.6), 400);
+setTimeout(()=>plant(W*.75, H*.55), 900);
+</script>
+</body>
+</html>
